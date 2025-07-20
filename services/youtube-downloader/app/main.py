@@ -187,7 +187,7 @@ async def global_exception_handler(request, exc):
     # 不处理HTTPException，让FastAPI自己处理
     if isinstance(exc, HTTPException):
         raise exc
-    
+
     logger.error(f"Global exception: {str(exc)}")
     return JSONResponse(status_code=500, content={"detail": "Internal server error"})
 

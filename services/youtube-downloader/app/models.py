@@ -73,12 +73,8 @@ class VideoInfo(BaseModel):
     thumbnail: Optional[str] = Field(default=None, description="缩略图URL")
     tags: Optional[List[str]] = Field(default=None, description="标签列表")
     categories: Optional[List[str]] = Field(default=None, description="分类列表")
-    available_qualities: Optional[List[str]] = Field(
-        default=None, description="可用质量"
-    )
-    available_subtitles: Optional[List[str]] = Field(
-        default=None, description="可用字幕语言"
-    )
+    available_qualities: Optional[List[str]] = Field(default=None, description="可用质量")
+    available_subtitles: Optional[List[str]] = Field(default=None, description="可用字幕语言")
 
 
 class DownloadResult(BaseModel):
@@ -86,9 +82,7 @@ class DownloadResult(BaseModel):
 
     video_path: Optional[str] = Field(default=None, description="视频文件路径")
     audio_path: Optional[str] = Field(default=None, description="音频文件路径")
-    subtitle_paths: Optional[Dict[str, str]] = Field(
-        default=None, description="字幕文件路径"
-    )
+    subtitle_paths: Optional[Dict[str, str]] = Field(default=None, description="字幕文件路径")
     thumbnail_path: Optional[str] = Field(default=None, description="缩略图路径")
     metadata: Optional[VideoInfo] = Field(default=None, description="视频元数据")
     file_size: Optional[int] = Field(default=None, description="文件大小（字节）")
@@ -102,6 +96,4 @@ class HealthCheck(BaseModel):
     service: str = Field(..., description="服务名称")
     timestamp: str = Field(..., description="检查时间")
     version: str = Field(..., description="服务版本")
-    dependencies: Optional[Dict[str, str]] = Field(
-        default=None, description="依赖服务状态"
-    )
+    dependencies: Optional[Dict[str, str]] = Field(default=None, description="依赖服务状态")
