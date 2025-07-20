@@ -16,17 +16,19 @@ downloader = YouTubeDownloader(download_path="downloads")
 @celery_app.task(bind=True, name="app.tasks.download_video_task")
 def download_video_task(
     self,
-    task_id: str,
     url: str,
     quality: str = "best",
     audio_only: bool = False,
     subtitle_langs: Optional[List[str]] = None,
+    download_thumbnail: bool = False,
+    download_description: bool = False,
 ) -> Dict[str, Any]:
     """异步视频下载任务"""
 
     if subtitle_langs is None:
         subtitle_langs = ["zh-CN", "en"]
 
+    task_id = self.request.id
     start_time = time.time()
 
     def progress_hook(d):
@@ -94,6 +96,8 @@ def download_video_task(
             quality=quality,
             audio_only=audio_only,
             subtitle_langs=subtitle_langs,
+            download_thumbnail=download_thumbnail,
+            download_description=download_description,
             progress_callback=progress_hook,
         )
 
@@ -109,6 +113,7 @@ def download_video_task(
             "audio_path": result.audio_path,
             "subtitle_paths": result.subtitle_paths,
             "thumbnail_path": result.thumbnail_path,
+            "description_path": result.description_path,
             "file_size": result.file_size,
             "metadata": result.metadata.model_dump() if result.metadata else None,
         }
@@ -150,14 +155,13 @@ def cleanup_task(max_age_hours: int = 24) -> Dict[str, Any]:
 
         result = {
             "status": "completed",
-            "files_before": stats_before["total_files"],
-            "files_after": stats_after["total_files"],
-            "files_removed": stats_before["total_files"] - stats_after["total_files"],
-            "size_freed_mb": round(
+            "deleted_files": stats_before["total_files"] - stats_after["total_files"],
+            "freed_space_mb": round(
                 (stats_before["total_size_bytes"] - stats_after["total_size_bytes"])
                 / (1024 * 1024),
                 2,
             ),
+            "remaining_files": stats_after["total_files"],
             "max_age_hours": max_age_hours,
         }
 
@@ -187,7 +191,7 @@ def get_video_info_task(url: str) -> Dict[str, Any]:
 
         try:
             info = loop.run_until_complete(downloader.get_video_info(url))
-            return {"status": "completed", "info": info.model_dump()}
+            return info.model_dump()
         finally:
             loop.close()
 
@@ -217,10 +221,24 @@ def health_check_task() -> Dict[str, Any]:
         # 获取统计信息
         stats = downloader.get_download_stats()
 
+        # 计算磁盘使用百分比
+        used_percent = round((used / total) * 100, 1)
+        
+        # 确定状态
+        status = "healthy"
+        warnings = []
+        if used_percent > 90:
+            status = "warning"
+            warnings.append("Low disk space")
+        
         return {
-            "status": "healthy",
-            "disk_free_gb": free_gb,
+            "status": status,
+            "disk_usage": {
+                "free_gb": round(free / (1024**3), 1),
+                "used_percent": used_percent,
+            },
             "download_stats": stats,
+            "warnings": warnings,
             "timestamp": time.time(),
         }
 
