@@ -25,7 +25,7 @@ from .models import (
     TaskStatus,
     VideoInfo,
     DownloadResult,
-    HealthCheck
+    HealthCheck,
 )
 
 __all__ = [
@@ -37,5 +37,5 @@ __all__ = [
     "TaskStatus",
     "VideoInfo",
     "DownloadResult",
-    "HealthCheck"
+    "HealthCheck",
 ]
