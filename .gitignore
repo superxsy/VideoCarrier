@@ -1,0 +1,73 @@
+# Git files
+.git/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Environment variables
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Redis
+dump.rdb
+*.rdb
+
+# Logs
+*.log
+logs/
+
+# Downloaded files
+services/youtube-downloader/downloads/*.mp4
+services/youtube-downloader/downloads/*.webm
+services/youtube-downloader/downloads/*.mkv
+services/youtube-downloader/downloads/*.webp
+services/youtube-downloader/downloads/*.jpg
+services/youtube-downloader/downloads/*.png
+
+# Redis installation
+Redis-x64-*.zip
+redis/
+
+# Temporary files
+*.tmp
+*.temp

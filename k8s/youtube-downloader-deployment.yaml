@@ -1,0 +1,234 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: youtube-downloader
+  namespace: videocarrier
+  labels:
+    app: youtube-downloader
+    component: downloader
+    version: v1.0.0
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: youtube-downloader
+  template:
+    metadata:
+      labels:
+        app: youtube-downloader
+        component: downloader
+        version: v1.0.0
+    spec:
+      containers:
+      - name: youtube-downloader
+        image: videocarrier/youtube-downloader:v1.0.0
+        ports:
+        - containerPort: 8000
+          name: http
+        env:
+        - name: REDIS_URL
+          value: "redis://redis-service:6379/0"
+        - name: STORAGE_PATH
+          value: "/app/downloads"
+        - name: LOG_LEVEL
+          value: "INFO"
+        volumeMounts:
+        - name: downloads-volume
+          mountPath: /app/downloads
+        - name: logs-volume
+          mountPath: /app/logs
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "2Gi"
+            cpu: "1000m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 30
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+      volumes:
+      - name: downloads-volume
+        persistentVolumeClaim:
+          claimName: downloads-pvc
+      - name: logs-volume
+        persistentVolumeClaim:
+          claimName: logs-pvc
+      restartPolicy: Always
+      imagePullPolicy: IfNotPresent
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: youtube-downloader-service
+  namespace: videocarrier
+  labels:
+    app: youtube-downloader
+spec:
+  selector:
+    app: youtube-downloader
+  ports:
+  - name: http
+    port: 8000
+    targetPort: 8000
+    protocol: TCP
+  type: ClusterIP
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: celery-worker
+  namespace: videocarrier
+  labels:
+    app: celery-worker
+    component: worker
+    version: v1.0.0
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: celery-worker
+  template:
+    metadata:
+      labels:
+        app: celery-worker
+        component: worker
+        version: v1.0.0
+    spec:
+      containers:
+      - name: celery-worker
+        image: videocarrier/youtube-downloader:v1.0.0
+        command: ["celery"]
+        args: ["-A", "app.celery", "worker", "--loglevel=info", "--concurrency=2"]
+        env:
+        - name: REDIS_URL
+          value: "redis://redis-service:6379/0"
+        - name: STORAGE_PATH
+          value: "/app/downloads"
+        - name: LOG_LEVEL
+          value: "INFO"
+        volumeMounts:
+        - name: downloads-volume
+          mountPath: /app/downloads
+        - name: logs-volume
+          mountPath: /app/logs
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: "500m"
+          limits:
+            memory: "4Gi"
+            cpu: "2000m"
+        livenessProbe:
+          exec:
+            command:
+            - celery
+            - -A
+            - app.celery
+            - inspect
+            - ping
+          initialDelaySeconds: 30
+          periodSeconds: 60
+          timeoutSeconds: 10
+          failureThreshold: 3
+      volumes:
+      - name: downloads-volume
+        persistentVolumeClaim:
+          claimName: downloads-pvc
+      - name: logs-volume
+        persistentVolumeClaim:
+          claimName: logs-pvc
+      restartPolicy: Always
+      imagePullPolicy: IfNotPresent
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: celery-flower
+  namespace: videocarrier
+  labels:
+    app: celery-flower
+    component: monitor
+    version: v1.0.0
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: celery-flower
+  template:
+    metadata:
+      labels:
+        app: celery-flower
+        component: monitor
+        version: v1.0.0
+    spec:
+      containers:
+      - name: celery-flower
+        image: videocarrier/youtube-downloader:v1.0.0
+        command: ["celery"]
+        args: ["-A", "app.celery", "flower", "--port=5555"]
+        ports:
+        - containerPort: 5555
+          name: flower
+        env:
+        - name: REDIS_URL
+          value: "redis://redis-service:6379/0"
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 5555
+          initialDelaySeconds: 30
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 5555
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+      restartPolicy: Always
+      imagePullPolicy: IfNotPresent
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: celery-flower-service
+  namespace: videocarrier
+  labels:
+    app: celery-flower
+spec:
+  selector:
+    app: celery-flower
+  ports:
+  - name: flower
+    port: 5555
+    targetPort: 5555
+    protocol: TCP
+  type: ClusterIP

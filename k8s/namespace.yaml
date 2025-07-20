@@ -1,0 +1,102 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: videocarrier
+  labels:
+    name: videocarrier
+    environment: production
+    project: video-carrier-platform
+
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: videocarrier-network-policy
+  namespace: videocarrier
+spec:
+  podSelector: {}
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: videocarrier
+    - namespaceSelector:
+        matchLabels:
+          name: ingress-nginx
+  - from: []
+    ports:
+    - protocol: TCP
+      port: 8000  # YouTube Downloader API
+    - protocol: TCP
+      port: 5555  # Celery Flower
+    - protocol: TCP
+      port: 6379  # Redis
+  egress:
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 53   # DNS
+    - protocol: UDP
+      port: 53   # DNS
+    - protocol: TCP
+      port: 80   # HTTP
+    - protocol: TCP
+      port: 443  # HTTPS
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: videocarrier
+    ports:
+    - protocol: TCP
+      port: 6379  # Redis内部通信
+    - protocol: TCP
+      port: 8000  # 服务间通信
+
+---
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: videocarrier-quota
+  namespace: videocarrier
+spec:
+  hard:
+    requests.cpu: "10"
+    requests.memory: 20Gi
+    limits.cpu: "20"
+    limits.memory: 40Gi
+    persistentvolumeclaims: "10"
+    pods: "50"
+    services: "20"
+    secrets: "20"
+    configmaps: "20"
+
+---
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: videocarrier-limits
+  namespace: videocarrier
+spec:
+  limits:
+  - default:
+      cpu: "1000m"
+      memory: "2Gi"
+    defaultRequest:
+      cpu: "100m"
+      memory: "256Mi"
+    type: Container
+  - max:
+      cpu: "4000m"
+      memory: "8Gi"
+    min:
+      cpu: "50m"
+      memory: "128Mi"
+    type: Container
+  - max:
+      storage: "200Gi"
+    min:
+      storage: "1Gi"
+    type: PersistentVolumeClaim

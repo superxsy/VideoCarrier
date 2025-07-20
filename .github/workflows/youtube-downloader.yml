@@ -1,0 +1,246 @@
+name: YouTube Downloader CI/CD
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'services/youtube-downloader/**'
+      - '.github/workflows/youtube-downloader.yml'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'services/youtube-downloader/**'
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: videocarrier/youtube-downloader
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: [3.11]
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+    
+    - name: Cache pip dependencies
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('services/youtube-downloader/requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+    
+    - name: Install dependencies
+      working-directory: ./services/youtube-downloader
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pytest-cov
+    
+    - name: Install system dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y ffmpeg
+    
+    - name: Lint with flake8
+      working-directory: ./services/youtube-downloader
+      run: |
+        flake8 app/ --count --select=E9,F63,F7,F82 --show-source --statistics
+        flake8 app/ --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+    
+    - name: Format check with black
+      working-directory: ./services/youtube-downloader
+      run: |
+        black --check app/
+    
+    - name: Start Redis for testing
+      uses: supercharge/redis-github-action@1.7.0
+      with:
+        redis-version: 7
+    
+    - name: Run tests with pytest
+      working-directory: ./services/youtube-downloader
+      env:
+        REDIS_URL: redis://localhost:6379/0
+        STORAGE_PATH: /tmp/test_downloads
+      run: |
+        mkdir -p /tmp/test_downloads
+        pytest tests/ -v --cov=app --cov-report=xml --cov-report=html
+    
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./services/youtube-downloader/coverage.xml
+        flags: youtube-downloader
+        name: youtube-downloader-coverage
+
+  security-scan:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Run Trivy vulnerability scanner
+      uses: aquasecurity/trivy-action@master
+      with:
+        scan-type: 'fs'
+        scan-ref: './services/youtube-downloader'
+        format: 'sarif'
+        output: 'trivy-results.sarif'
+    
+    - name: Upload Trivy scan results to GitHub Security tab
+      uses: github/codeql-action/upload-sarif@v2
+      if: always()
+      with:
+        sarif_file: 'trivy-results.sarif'
+
+  build-and-push:
+    needs: [test, security-scan]
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    permissions:
+      contents: read
+      packages: write
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+    
+    - name: Log in to Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    
+    - name: Extract metadata
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+        tags: |
+          type=ref,event=branch
+          type=ref,event=pr
+          type=sha,prefix={{branch}}-
+          type=raw,value=latest,enable={{is_default_branch}}
+    
+    - name: Build and push Docker image
+      uses: docker/build-push-action@v5
+      with:
+        context: ./services/youtube-downloader
+        platforms: linux/amd64,linux/arm64
+        push: true
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+        build-args: |
+          BUILDTIME=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.created'] }}
+          VERSION=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.version'] }}
+          REVISION=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.revision'] }}
+
+  deploy-staging:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/develop'
+    environment: staging
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Configure kubectl
+      uses: azure/k8s-set-context@v3
+      with:
+        method: kubeconfig
+        kubeconfig: ${{ secrets.KUBE_CONFIG_STAGING }}
+    
+    - name: Deploy to staging
+      run: |
+        # 更新镜像标签
+        sed -i "s|videocarrier/youtube-downloader:v1.0.0|${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:develop-${{ github.sha }}|g" k8s/youtube-downloader-deployment.yaml
+        
+        # 应用配置
+        kubectl apply -f k8s/namespace.yaml
+        kubectl apply -f k8s/redis-deployment.yaml
+        kubectl apply -f k8s/youtube-downloader-deployment.yaml
+        
+        # 等待部署完成
+        kubectl rollout status deployment/youtube-downloader -n videocarrier --timeout=300s
+        kubectl rollout status deployment/celery-worker -n videocarrier --timeout=300s
+    
+    - name: Run smoke tests
+      run: |
+        # 等待服务就绪
+        kubectl wait --for=condition=ready pod -l app=youtube-downloader -n videocarrier --timeout=300s
+        
+        # 获取服务端点
+        SERVICE_IP=$(kubectl get svc youtube-downloader-service -n videocarrier -o jsonpath='{.spec.clusterIP}')
+        
+        # 健康检查
+        kubectl run test-pod --image=curlimages/curl:latest --rm -i --restart=Never -- \
+          curl -f http://$SERVICE_IP:8000/health
+
+  deploy-production:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    environment: production
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Configure kubectl
+      uses: azure/k8s-set-context@v3
+      with:
+        method: kubeconfig
+        kubeconfig: ${{ secrets.KUBE_CONFIG_PRODUCTION }}
+    
+    - name: Deploy to production
+      run: |
+        # 更新镜像标签
+        sed -i "s|videocarrier/youtube-downloader:v1.0.0|${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:main-${{ github.sha }}|g" k8s/youtube-downloader-deployment.yaml
+        
+        # 应用配置
+        kubectl apply -f k8s/namespace.yaml
+        kubectl apply -f k8s/redis-deployment.yaml
+        kubectl apply -f k8s/youtube-downloader-deployment.yaml
+        
+        # 滚动更新
+        kubectl rollout status deployment/youtube-downloader -n videocarrier --timeout=600s
+        kubectl rollout status deployment/celery-worker -n videocarrier --timeout=600s
+    
+    - name: Post-deployment verification
+      run: |
+        # 验证部署
+        kubectl get pods -n videocarrier
+        kubectl get svc -n videocarrier
+        
+        # 健康检查
+        kubectl wait --for=condition=ready pod -l app=youtube-downloader -n videocarrier --timeout=300s
+        
+        # 获取服务状态
+        SERVICE_IP=$(kubectl get svc youtube-downloader-service -n videocarrier -o jsonpath='{.spec.clusterIP}')
+        kubectl run health-check --image=curlimages/curl:latest --rm -i --restart=Never -- \
+          curl -f http://$SERVICE_IP:8000/health
+    
+    - name: Notify deployment success
+      if: success()
+      run: |
+        echo "✅ YouTube Downloader deployed successfully to production"
+        echo "🔗 Service endpoint: youtube-downloader-service.videocarrier.svc.cluster.local:8000"
+        echo "📊 Monitoring: celery-flower-service.videocarrier.svc.cluster.local:5555"
