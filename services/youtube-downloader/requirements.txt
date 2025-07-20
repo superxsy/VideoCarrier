@@ -7,7 +7,7 @@ yt-dlp==2023.12.30
 
 # Task queue
 celery[redis]==5.3.4
-redis==5.0.1
+redis==4.6.0
 
 # Data validation
 pydantic==2.5.2
