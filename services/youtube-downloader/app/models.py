@@ -84,6 +84,7 @@ class DownloadResult(BaseModel):
     audio_path: Optional[str] = Field(default=None, description="音频文件路径")
     subtitle_paths: Optional[Dict[str, str]] = Field(default=None, description="字幕文件路径")
     thumbnail_path: Optional[str] = Field(default=None, description="缩略图路径")
+    description_path: Optional[str] = Field(default=None, description="描述文件路径")
     metadata: Optional[VideoInfo] = Field(default=None, description="视频元数据")
     file_size: Optional[int] = Field(default=None, description="文件大小（字节）")
     download_time: Optional[float] = Field(default=None, description="下载耗时（秒）")

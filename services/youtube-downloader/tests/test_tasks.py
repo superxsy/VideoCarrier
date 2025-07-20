@@ -23,12 +23,11 @@ class TestCeleryTasks:
         with tempfile.TemporaryDirectory() as temp_dir:
             yield temp_dir
     
-    @patch('app.tasks.YouTubeDownloader')
-    def test_download_video_task_success(self, mock_downloader_class, temp_dir):
+    @patch('app.tasks.downloader')
+    def test_download_video_task_success(self, mock_downloader, temp_dir):
         """测试成功的视频下载任务"""
-        # 模拟下载器实例
-        mock_downloader = Mock()
-        mock_downloader_class.return_value = mock_downloader
+        # mock_downloader 已经是模拟的下载器实例
+        mock_downloader.validate_url.return_value = True
         
         # 模拟下载结果
         mock_result = DownloadResult(
@@ -72,22 +71,21 @@ class TestCeleryTasks:
         assert result["metadata"]["title"] == "Test Video"
         
         # 验证下载器被正确调用
-        mock_downloader.download_video.assert_called_once_with(
-            url="https://www.youtube.com/watch?v=test_video",
-            quality="720p",
-            audio_only=False,
-            subtitle_langs=["en"],
-            download_thumbnail=False,
-            download_description=False,
-            progress_callback=None
-        )
+        mock_downloader.download_video.assert_called_once()
+        call_args = mock_downloader.download_video.call_args
+        assert call_args[1]['url'] == "https://www.youtube.com/watch?v=test_video"
+        assert call_args[1]['quality'] == "720p"
+        assert call_args[1]['audio_only'] == False
+        assert call_args[1]['subtitle_langs'] == ["en"]
+        assert call_args[1]['download_thumbnail'] == False
+        assert call_args[1]['download_description'] == False
+        assert callable(call_args[1]['progress_callback'])  # 验证progress_callback是一个函数
     
-    @patch('app.tasks.YouTubeDownloader')
-    def test_download_video_task_with_progress(self, mock_downloader_class):
+    @patch('app.tasks.downloader')
+    def test_download_video_task_with_progress(self, mock_downloader):
         """测试带进度回调的视频下载任务"""
-        # 模拟下载器实例
-        mock_downloader = Mock()
-        mock_downloader_class.return_value = mock_downloader
+        # mock_downloader 已经是模拟的下载器实例
+        mock_downloader.validate_url.return_value = True
         
         # 模拟下载结果
         mock_result = DownloadResult(
@@ -143,12 +141,11 @@ class TestCeleryTasks:
         assert result["video_path"] == "/downloads/test.mp4"
         assert result["file_size"] == 2048000
     
-    @patch('app.tasks.YouTubeDownloader')
-    def test_download_video_task_failure(self, mock_downloader_class):
+    @patch('app.tasks.downloader')
+    def test_download_video_task_failure(self, mock_downloader):
         """测试下载任务失败"""
-        # 模拟下载器实例
-        mock_downloader = Mock()
-        mock_downloader_class.return_value = mock_downloader
+        # mock_downloader 已经是模拟的下载器实例
+        mock_downloader.validate_url.return_value = True
         
         # 模拟下载失败
         mock_downloader.download_video.side_effect = Exception("Download failed: Video not available")
@@ -160,12 +157,11 @@ class TestCeleryTasks:
                 quality="720p"
             )
     
-    @patch('app.tasks.YouTubeDownloader')
-    def test_download_video_task_audio_only(self, mock_downloader_class, temp_dir):
+    @patch('app.tasks.downloader')
+    def test_download_video_task_audio_only(self, mock_downloader, temp_dir):
         """测试仅音频下载任务"""
-        # 模拟下载器实例
-        mock_downloader = Mock()
-        mock_downloader_class.return_value = mock_downloader
+        # mock_downloader 已经是模拟的下载器实例
+        mock_downloader.validate_url.return_value = True
         
         # 模拟音频下载结果
         mock_result = DownloadResult(
@@ -206,22 +202,20 @@ class TestCeleryTasks:
         assert result["file_size"] == 512000
         
         # 验证下载器被正确调用
-        mock_downloader.download_video.assert_called_once_with(
-            url="https://www.youtube.com/watch?v=test_audio",
-            quality="best",
-            audio_only=True,
-            subtitle_langs=None,
-            download_thumbnail=False,
-            download_description=False,
-            progress_callback=None
-        )
+        mock_downloader.download_video.assert_called_once()
+        call_args = mock_downloader.download_video.call_args
+        assert call_args[1]['url'] == "https://www.youtube.com/watch?v=test_audio"
+        assert call_args[1]['quality'] == "best"
+        assert call_args[1]['audio_only'] == True
+        assert call_args[1]['subtitle_langs'] == ["zh-CN", "en"]  # 默认值
+        assert call_args[1]['download_thumbnail'] == False
+        assert call_args[1]['download_description'] == False
+        assert callable(call_args[1]['progress_callback'])  # 验证progress_callback是一个函数
     
-    @patch('app.tasks.YouTubeDownloader')
-    def test_get_video_info_task_success(self, mock_downloader_class):
+    @patch('app.tasks.downloader')
+    def test_get_video_info_task_success(self, mock_downloader):
         """测试成功获取视频信息任务"""
-        # 模拟下载器实例
-        mock_downloader = Mock()
-        mock_downloader_class.return_value = mock_downloader
+        # mock_downloader 已经是模拟的下载器实例
         
         # 模拟视频信息
         mock_info = VideoInfo(
@@ -258,12 +252,10 @@ class TestCeleryTasks:
         assert "720p" in result["available_qualities"]
         assert "zh-CN" in result["available_subtitles"]
     
-    @patch('app.tasks.YouTubeDownloader')
-    def test_get_video_info_task_failure(self, mock_downloader_class):
+    @patch('app.tasks.downloader')
+    def test_get_video_info_task_failure(self, mock_downloader):
         """测试获取视频信息任务失败"""
-        # 模拟下载器实例
-        mock_downloader = Mock()
-        mock_downloader_class.return_value = mock_downloader
+        # mock_downloader 已经是模拟的下载器实例
         
         # 模拟获取信息失败
         async def mock_get_info_fail(url):
@@ -275,54 +267,49 @@ class TestCeleryTasks:
         with pytest.raises(Exception, match="Video not found"):
             get_video_info_task(url="https://www.youtube.com/watch?v=invalid")
     
-    @patch('app.tasks.YouTubeDownloader')
-    def test_cleanup_task(self, mock_downloader_class, temp_dir):
+    @patch('app.tasks.downloader')
+    def test_cleanup_task(self, mock_downloader, temp_dir):
         """测试清理任务"""
-        # 模拟下载器实例
-        mock_downloader = Mock()
-        mock_downloader_class.return_value = mock_downloader
+        # mock_downloader 已经是模拟的下载器实例
         
-        # 创建测试文件
-        old_file = Path(temp_dir) / "old_file.mp4"
-        new_file = Path(temp_dir) / "new_file.mp4"
+        # 模拟清理前的统计信息
+        stats_before = {
+            "total_files": 5,
+            "total_size_bytes": 1024000,
+            "total_size_mb": 1.0,
+            "download_path": temp_dir
+        }
         
-        old_file.write_text("old content")
-        new_file.write_text("new content")
+        # 模拟清理后的统计信息
+        stats_after = {
+            "total_files": 4,
+            "total_size_bytes": 1000000,
+            "total_size_mb": 0.95,
+            "download_path": temp_dir
+        }
         
-        # 修改旧文件时间戳
-        old_time = time.time() - 25 * 3600  # 25小时前
-        os.utime(old_file, (old_time, old_time))
-        
-        # 模拟清理方法
-        def mock_cleanup(max_age_hours):
-            if old_file.exists():
-                old_file.unlink()
-            return {
-                "deleted_files": 1,
-                "freed_space_mb": 0.01,
-                "remaining_files": 1
-            }
-        
-        mock_downloader.cleanup_old_files.side_effect = mock_cleanup
+        # 设置get_download_stats的返回值序列
+        mock_downloader.get_download_stats.side_effect = [stats_before, stats_after]
         
         # 执行清理任务
         result = cleanup_task(max_age_hours=24)
         
         # 验证结果
-        assert result["deleted_files"] == 1
-        assert result["freed_space_mb"] == 0.01
-        assert result["remaining_files"] == 1
+        assert result["status"] == "completed"
+        assert result["deleted_files"] == 1  # 5 - 4 = 1
+        assert result["freed_space_mb"] == 0.02  # (1024000 - 1000000) / (1024*1024) ≈ 0.02
+        assert result["remaining_files"] == 4
+        assert result["max_age_hours"] == 24
         
-        # 验证清理方法被调用
-        mock_downloader.cleanup_old_files.assert_called_once_with(max_age_hours=24)
+        # 验证方法被正确调用
+        mock_downloader.cleanup_old_files.assert_called_once_with(24)
+        assert mock_downloader.get_download_stats.call_count == 2
     
-    @patch('app.tasks.YouTubeDownloader')
+    @patch('app.tasks.downloader')
     @patch('shutil.disk_usage')
-    def test_health_check_task(self, mock_disk_usage, mock_downloader_class, temp_dir):
+    def test_health_check_task(self, mock_disk_usage, mock_downloader, temp_dir):
         """测试健康检查任务"""
-        # 模拟下载器实例
-        mock_downloader = Mock()
-        mock_downloader_class.return_value = mock_downloader
+        # mock_downloader 已经是模拟的下载器实例
         
         # 模拟磁盘使用情况
         mock_disk_usage.return_value = (100 * 1024**3, 80 * 1024**3, 20 * 1024**3)  # total, used, free
@@ -347,13 +334,11 @@ class TestCeleryTasks:
         assert result["download_stats"]["total_size_mb"] == 976.56
         assert "timestamp" in result
     
-    @patch('app.tasks.YouTubeDownloader')
+    @patch('app.tasks.downloader')
     @patch('shutil.disk_usage')
-    def test_health_check_task_low_disk_space(self, mock_disk_usage, mock_downloader_class):
+    def test_health_check_task_low_disk_space(self, mock_disk_usage, mock_downloader):
         """测试磁盘空间不足的健康检查"""
-        # 模拟下载器实例
-        mock_downloader = Mock()
-        mock_downloader_class.return_value = mock_downloader
+        # mock_downloader 已经是模拟的下载器实例
         
         # 模拟磁盘空间不足
         mock_disk_usage.return_value = (100 * 1024**3, 95 * 1024**3, 5 * 1024**3)  # 95% used
@@ -375,12 +360,11 @@ class TestCeleryTasks:
         assert result["disk_usage"]["used_percent"] == 95.0
         assert "Low disk space" in result["warnings"]
     
-    @patch('app.tasks.YouTubeDownloader')
-    def test_download_video_task_with_all_options(self, mock_downloader_class, temp_dir):
+    @patch('app.tasks.downloader')
+    def test_download_video_task_with_all_options(self, mock_downloader, temp_dir):
         """测试包含所有选项的下载任务"""
-        # 模拟下载器实例
-        mock_downloader = Mock()
-        mock_downloader_class.return_value = mock_downloader
+        # mock_downloader 已经是模拟的下载器实例
+        mock_downloader.validate_url.return_value = True
         
         # 模拟完整下载结果
         mock_result = DownloadResult(
@@ -431,12 +415,12 @@ class TestCeleryTasks:
         assert result["file_size"] == 3072000
         
         # 验证下载器被正确调用
-        mock_downloader.download_video.assert_called_once_with(
-            url="https://www.youtube.com/watch?v=full_test",
-            quality="1080p",
-            audio_only=False,
-            subtitle_langs=["en", "zh-CN"],
-            download_thumbnail=True,
-            download_description=True,
-            progress_callback=None
-        )
+        mock_downloader.download_video.assert_called_once()
+        call_args = mock_downloader.download_video.call_args
+        assert call_args[1]['url'] == "https://www.youtube.com/watch?v=full_test"
+        assert call_args[1]['quality'] == "1080p"
+        assert call_args[1]['audio_only'] == False
+        assert call_args[1]['subtitle_langs'] == ["en", "zh-CN"]
+        assert call_args[1]['download_thumbnail'] == True
+        assert call_args[1]['download_description'] == True
+        assert callable(call_args[1]['progress_callback'])  # 验证progress_callback是一个函数

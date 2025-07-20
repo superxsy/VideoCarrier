@@ -187,6 +187,8 @@ class YouTubeDownloader:
         audio_only: bool = False,
         subtitle_langs: Optional[List[str]] = None,
         progress_callback=None,
+        download_thumbnail: bool = False,
+        download_description: bool = False,
     ) -> DownloadResult:
         """下载视频"""
 
@@ -235,6 +237,7 @@ class YouTubeDownloader:
                 audio_path = None
                 subtitle_paths = {}
                 thumbnail_path = None
+                description_path = None
 
                 # 查找视频/音频文件
                 for ext in ["mp4", "webm", "mkv", "m4a", "mp3"]:
@@ -260,6 +263,16 @@ class YouTubeDownloader:
                     if thumb_file.exists():
                         thumbnail_path = str(thumb_file)
                         break
+
+                # 处理描述文件（如果需要下载描述）
+                if download_description and info and isinstance(info, dict) and info.get("description"):
+                    description_file = self.download_path / f"{video_id}.description"
+                    try:
+                        with open(description_file, 'w', encoding='utf-8') as f:
+                            f.write(info.get("description", ""))
+                        description_path = str(description_file)
+                    except Exception as e:
+                        logger.warning(f"Failed to save description file: {str(e)}")
 
                 # 计算文件大小
                 file_size = 0
@@ -349,6 +362,7 @@ class YouTubeDownloader:
                     audio_path=audio_path,
                     subtitle_paths=subtitle_paths,
                     thumbnail_path=thumbnail_path,
+                    description_path=description_path,
                     metadata=video_info,
                     file_size=file_size,
                     download_time=None,  # 将在调用方计算
