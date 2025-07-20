@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>任务状态测试</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .task { border: 1px solid #ccc; padding: 10px; margin: 10px 0; }
+        .completed { background-color: #d4edda; }
+        .processing { background-color: #fff3cd; }
+        .failed { background-color: #f8d7da; }
+        .pending { background-color: #d1ecf1; }
+    </style>
+</head>
+<body>
+    <h1>任务状态测试页面</h1>
+    <button onclick="loadTasks()">刷新任务状态</button>
+    <div id="tasks"></div>
+
+    <script>
+        async function loadTasks() {
+            const tasksDiv = document.getElementById('tasks');
+            tasksDiv.innerHTML = '加载中...';
+            
+            try {
+                // 获取所有任务ID
+                const taskIds = [
+                    'fa5bbe4e-005f-448a-a1e1-1abadfe65aa6',
+                    '4dea1e8a-1037-4816-8a9d-4af30a71ad21',
+                    '05de5a42-596b-4e19-8192-1f7481efc2a0'
+                ];
+                
+                let html = '';
+                
+                for (const taskId of taskIds) {
+                    try {
+                        const response = await fetch(`/status/${taskId}`);
+                        const data = await response.json();
+                        
+                        html += `
+                            <div class="task ${data.status}">
+                                <h3>任务 ID: ${taskId}</h3>
+                                <p><strong>状态:</strong> ${data.status}</p>
+                                <p><strong>消息:</strong> ${data.message}</p>
+                                ${data.progress ? `<p><strong>进度:</strong> ${data.progress}%</p>` : ''}
+                                ${data.current_step ? `<p><strong>当前步骤:</strong> ${data.current_step}</p>` : ''}
+                                ${data.result ? `<p><strong>结果:</strong> <pre>${JSON.stringify(data.result, null, 2)}</pre></p>` : ''}
+                                ${data.error ? `<p><strong>错误:</strong> ${data.error}</p>` : ''}
+                                <p><strong>创建时间:</strong> ${data.created_at}</p>
+                                <p><strong>更新时间:</strong> ${data.updated_at}</p>
+                            </div>
+                        `;
+                    } catch (error) {
+                        html += `
+                            <div class="task failed">
+                                <h3>任务 ID: ${taskId}</h3>
+                                <p><strong>错误:</strong> ${error.message}</p>
+                            </div>
+                        `;
+                    }
+                }
+                
+                tasksDiv.innerHTML = html;
+                
+            } catch (error) {
+                tasksDiv.innerHTML = `<p>加载失败: ${error.message}</p>`;
+            }
+        }
+        
+        // 页面加载时自动加载任务
+        window.onload = loadTasks;
+    </script>
+</body>
+</html>

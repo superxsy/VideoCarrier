@@ -1,5 +1,6 @@
 from fastapi import FastAPI, HTTPException, BackgroundTasks
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import HttpUrl
 from loguru import logger
 import os
@@ -24,6 +25,10 @@ app = FastAPI(
     version="1.0.0"
 )
 
+# Mount static files
+app.mount("/static", StaticFiles(directory="static"), name="static")
+app.mount("/downloads", StaticFiles(directory="downloads"), name="downloads")
+
 # Initialize downloader
 downloader = YouTubeDownloader(download_path="downloads")
 
@@ -39,11 +44,22 @@ async def health_check():
 
 @app.get("/")
 async def root():
-    """根路径"""
+    """前端页面"""
+    return FileResponse('static/index.html')
+
+@app.get("/test")
+async def test_page():
+    """测试页面"""
+    return FileResponse('test_frontend.html')
+
+@app.get("/api")
+async def api_info():
+    """API信息"""
     return {
-        "message": "YouTube Downloader Service",
+        "message": "YouTube Downloader Service API",
         "docs": "/docs",
-        "health": "/health"
+        "health": "/health",
+        "frontend": "/"
     }
 
 @app.post("/download", response_model=DownloadResponse)

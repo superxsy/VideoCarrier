@@ -3,6 +3,8 @@
 
 # Python cache
 __pycache__/
+*/__pycache__/
+**/__pycache__/
 *.pyc
 *.pyo
 *.pyd
@@ -57,6 +59,7 @@ dump.rdb
 logs/
 
 # Downloaded files
+services/youtube-downloader/downloads/
 services/youtube-downloader/downloads/*.mp4
 services/youtube-downloader/downloads/*.webm
 services/youtube-downloader/downloads/*.mkv

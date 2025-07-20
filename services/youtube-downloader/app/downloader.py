@@ -28,15 +28,28 @@ class YouTubeDownloader:
         
     def validate_url(self, url: str) -> bool:
         """验证YouTube URL"""
+        # 先标准化URL
+        url = url.strip()
+        
+        # 如果没有协议，添加https://
+        if not url.startswith(('http://', 'https://')):
+            if url.startswith('www.'):
+                url = 'https://' + url
+            elif url.startswith(('youtube.com', 'youtu.be', 'm.youtube.com')):
+                url = 'https://' + url
+            elif 'youtube.com' in url or 'youtu.be' in url:
+                url = 'https://' + url
+        
         youtube_patterns = [
             r'(?:https?://)?(?:www\.)?youtube\.com/watch\?v=([\w-]+)',
             r'(?:https?://)?(?:www\.)?youtu\.be/([\w-]+)',
             r'(?:https?://)?(?:www\.)?youtube\.com/embed/([\w-]+)',
-            r'(?:https?://)?(?:www\.)?youtube\.com/v/([\w-]+)'
+            r'(?:https?://)?(?:www\.)?youtube\.com/v/([\w-]+)',
+            r'(?:https?://)?(?:m\.)?youtube\.com/watch\?v=([\w-]+)'
         ]
         
         for pattern in youtube_patterns:
-            if re.match(pattern, url):
+            if re.search(pattern, url):
                 return True
         return False
     
@@ -48,6 +61,7 @@ class YouTubeDownloader:
                 'quiet': True,
                 'no_warnings': True,
                 'extract_flat': False,
+                'noplaylist': True,  # 只获取单个视频信息，不处理播放列表
             })
             
             with yt_dlp.YoutubeDL(opts) as ydl:
@@ -111,6 +125,9 @@ class YouTubeDownloader:
             
         # 构建下载选项
         opts = self.base_opts.copy()
+        
+        # 防止下载整个播放列表，只下载当前视频
+        opts['noplaylist'] = True
         
         # 设置质量
         if audio_only:
