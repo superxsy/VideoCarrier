@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YouTube 视频下载器</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            padding: 40px;
+            max-width: 600px;
+            width: 100%;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            color: #333;
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .header p {
+            color: #666;
+            font-size: 1.1em;
+        }
+
+        .form-group {
+            margin-bottom: 25px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 600;
+            font-size: 1.1em;
+        }
+
+        input[type="url"], select {
+            width: 100%;
+            padding: 15px;
+            border: 2px solid #e1e5e9;
+            border-radius: 10px;
+            font-size: 16px;
+            transition: all 0.3s ease;
+            background: #f8f9fa;
+        }
+
+        input[type="url"]:focus, select:focus {
+            outline: none;
+            border-color: #667eea;
+            background: white;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        input[type="checkbox"] {
+            width: 20px;
+            height: 20px;
+            accent-color: #667eea;
+        }
+
+        .checkbox-group label {
+            margin: 0;
+            font-weight: normal;
+            cursor: pointer;
+        }
+
+        .btn {
+            width: 100%;
+            padding: 15px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 18px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-top: 20px;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+        }
+
+        .btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .progress-container {
+            margin-top: 30px;
+            display: none;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 20px;
+            background: #e1e5e9;
+            border-radius: 10px;
+            overflow: hidden;
+            margin-bottom: 15px;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            width: 0%;
+            transition: width 0.3s ease;
+            border-radius: 10px;
+        }
+
+        .status-info {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            border-left: 4px solid #667eea;
+        }
+
+        .status-info h3 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        .status-info p {
+            color: #666;
+            margin-bottom: 5px;
+        }
+
+        .result-container {
+            margin-top: 20px;
+            padding: 20px;
+            background: #e8f5e8;
+            border-radius: 10px;
+            border-left: 4px solid #28a745;
+            display: none;
+        }
+
+        .error-container {
+            margin-top: 20px;
+            padding: 20px;
+            background: #ffeaea;
+            border-radius: 10px;
+            border-left: 4px solid #dc3545;
+            display: none;
+        }
+
+        .download-link {
+            display: inline-block;
+            margin-top: 10px;
+            padding: 10px 20px;
+            background: #28a745;
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+            transition: background 0.3s ease;
+        }
+
+        .download-link:hover {
+            background: #218838;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 20px;
+                margin: 10px;
+            }
+
+            .header h1 {
+                font-size: 2em;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎥 YouTube 下载器</h1>
+            <p>快速下载您喜爱的YouTube视频</p>
+        </div>
+
+        <form id="downloadForm">
+            <div class="form-group">
+                <label for="videoUrl">📺 视频链接</label>
+                <input type="url" id="videoUrl" placeholder="请输入YouTube视频链接..." required>
+                <div id="urlPreview" style="margin-top: 8px; padding: 8px; background: #f0f8ff; border-radius: 5px; font-size: 14px; color: #666; display: none; cursor: pointer; border: 1px solid #e3f2fd; transition: all 0.2s ease;" title="点击应用补全，或按Tab键">
+                    <span style="color: #28a745; font-weight: 600;">✓ 自动补全:</span> <span id="previewUrl"></span>
+                    <span style="color: #999; font-size: 12px; margin-left: 10px;">(点击应用或按Tab)</span>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="quality">🎬 视频质量</label>
+                <select id="quality">
+                    <option value="best">最佳质量</option>
+                    <option value="1080p">1080p HD</option>
+                    <option value="720p">720p HD</option>
+                    <option value="worst">最低质量</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <div class="checkbox-group">
+                    <input type="checkbox" id="audioOnly">
+                    <label for="audioOnly">🎵 仅下载音频</label>
+                </div>
+            </div>
+
+            <button type="submit" class="btn" id="downloadBtn">
+                🚀 开始下载
+            </button>
+        </form>
+        
+        <div style="margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 8px;">
+            <h3>🔧 调试工具</h3>
+            <div style="margin-bottom: 10px;">
+                <input type="text" id="debugTaskId" placeholder="输入任务ID" style="padding: 8px; margin-right: 10px; width: 300px;">
+                <button onclick="window.downloader.checkSpecificTask()" style="padding: 8px 15px;">检查任务状态</button>
+            </div>
+            <button onclick="window.downloader.clearCurrentTask()" style="padding: 8px 15px; margin-right: 10px;">清除当前任务</button>
+            <button onclick="window.downloader.showDebugInfo()" style="padding: 8px 15px;">显示调试信息</button>
+        </div>
+
+        <div class="progress-container" id="progressContainer">
+            <div class="progress-bar">
+                <div class="progress-fill" id="progressFill"></div>
+            </div>
+            <div class="status-info" id="statusInfo">
+                <h3 id="statusTitle">准备中...</h3>
+                <p id="statusMessage">正在初始化下载任务</p>
+                <p id="progressText">进度: 0%</p>
+            </div>
+        </div>
+
+        <div class="result-container" id="resultContainer">
+            <h3>✅ 下载完成！</h3>
+            <p id="resultMessage">您的视频已成功下载</p>
+            <div id="downloadLinks"></div>
+        </div>
+
+        <div class="error-container" id="errorContainer">
+            <h3>❌ 下载失败</h3>
+            <p id="errorMessage">请检查链接是否正确或稍后重试</p>
+        </div>
+    </div>
+
+    <script>
+        class YouTubeDownloader {
+            constructor() {
+                this.form = document.getElementById('downloadForm');
+                this.progressContainer = document.getElementById('progressContainer');
+                this.resultContainer = document.getElementById('resultContainer');
+                this.errorContainer = document.getElementById('errorContainer');
+                this.downloadBtn = document.getElementById('downloadBtn');
+                this.progressFill = document.getElementById('progressFill');
+                this.statusTitle = document.getElementById('statusTitle');
+                this.statusMessage = document.getElementById('statusMessage');
+                this.progressText = document.getElementById('progressText');
+                this.resultMessage = document.getElementById('resultMessage');
+                this.errorMessage = document.getElementById('errorMessage');
+                this.downloadLinks = document.getElementById('downloadLinks');
+                
+                this.currentTaskId = null;
+                this.statusInterval = null;
+                
+                this.init();
+            }
+
+            init() {
+                this.form.addEventListener('submit', (e) => this.handleSubmit(e));
+                
+                // 添加URL输入实时预览
+                const urlInput = document.getElementById('videoUrl');
+                const urlPreview = document.getElementById('urlPreview');
+                const previewUrl = document.getElementById('previewUrl');
+                
+                urlInput.addEventListener('input', (e) => {
+                    const inputValue = e.target.value.trim();
+                    
+                    if (inputValue) {
+                        const normalizedUrl = this.normalizeUrl(inputValue);
+                        
+                        // 只有当URL被修改时才显示预览
+                        if (normalizedUrl !== inputValue) {
+                            previewUrl.textContent = normalizedUrl;
+                            urlPreview.style.display = 'block';
+                        } else {
+                            urlPreview.style.display = 'none';
+                        }
+                    } else {
+                        urlPreview.style.display = 'none';
+                    }
+                });
+                
+                // 添加点击预览区域自动应用补全的功能
+                urlPreview.addEventListener('click', () => {
+                    const normalizedUrl = previewUrl.textContent;
+                    if (normalizedUrl) {
+                        urlInput.value = normalizedUrl;
+                        urlPreview.style.display = 'none';
+                        urlInput.focus();
+                    }
+                });
+                
+                // 添加鼠标悬停效果
+                urlPreview.addEventListener('mouseenter', () => {
+                    urlPreview.style.background = '#e3f2fd';
+                    urlPreview.style.borderColor = '#2196f3';
+                });
+                
+                urlPreview.addEventListener('mouseleave', () => {
+                    urlPreview.style.background = '#f0f8ff';
+                    urlPreview.style.borderColor = '#e3f2fd';
+                })
+                
+                // 添加Tab键自动补全功能
+                urlInput.addEventListener('keydown', (e) => {
+                    if (e.key === 'Tab' && urlPreview.style.display === 'block') {
+                        e.preventDefault();
+                        const normalizedUrl = previewUrl.textContent;
+                        if (normalizedUrl) {
+                            urlInput.value = normalizedUrl;
+                            urlPreview.style.display = 'none';
+                        }
+                    }
+                })
+                
+                // 失去焦点时隐藏预览
+                urlInput.addEventListener('blur', () => {
+                    setTimeout(() => {
+                        urlPreview.style.display = 'none';
+                    }, 200);
+                });
+            }
+
+            async handleSubmit(e) {
+                e.preventDefault();
+                
+                const urlInput = document.getElementById('videoUrl');
+                let url = urlInput.value.trim();
+                
+                // 验证URL是否为空
+                if (!url) {
+                    alert('请输入YouTube视频链接！');
+                    urlInput.focus();
+                    return;
+                }
+                
+                // 自动补全URL格式
+                url = this.normalizeUrl(url);
+                
+                // 将标准化后的URL更新回输入框
+                urlInput.value = url;
+                
+                const quality = document.getElementById('quality').value;
+                const audioOnly = document.getElementById('audioOnly').checked;
+                
+                this.hideContainers();
+                this.showProgress();
+                this.disableForm();
+                
+                try {
+                    const response = await fetch('/download', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            url: url,
+                            quality: quality,
+                            audio_only: audioOnly,
+                            subtitle_langs: ['zh-CN', 'en']
+                        })
+                    });
+                    
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    
+                    const data = await response.json();
+                    this.currentTaskId = data.task_id;
+                    
+                    this.updateStatus('提交成功', '任务已提交，正在处理中...', 0);
+                    this.startStatusPolling();
+                    
+                } catch (error) {
+                    this.showError(`提交失败: ${error.message}`);
+                    this.enableForm();
+                }
+            }
+
+            startStatusPolling() {
+                this.statusInterval = setInterval(() => {
+                    this.checkTaskStatus();
+                }, 2000);
+            }
+
+            async checkTaskStatus() {
+                if (!this.currentTaskId) return;
+                
+                try {
+                    const response = await fetch(`/status/${this.currentTaskId}`);
+                    const data = await response.json();
+                    
+                    // 添加调试信息
+                    console.log('Task status response:', data);
+                    
+                    switch (data.status) {
+                        case 'pending':
+                            this.updateStatus('等待中', '任务正在队列中等待处理...', 0);
+                            break;
+                        case 'processing':
+                            const progress = data.progress || 0;
+                            const step = data.current_step || '处理中';
+                            this.updateStatus('下载中', step, progress);
+                            break;
+                        case 'completed':
+                            console.log('Task completed, showing result:', data.result);
+                            this.updateStatus('完成', '下载已完成！', 100);
+                            this.showResult(data.result);
+                            this.stopStatusPolling();
+                            this.enableForm();
+                            break;
+                        case 'failed':
+                            this.showError(data.error || '下载失败');
+                            this.stopStatusPolling();
+                            this.enableForm();
+                            break;
+                        default:
+                            console.warn('Unknown task status:', data.status);
+                            break;
+                    }
+                } catch (error) {
+                    console.error('Status check failed:', error);
+                }
+            }
+
+            updateStatus(title, message, progress) {
+                this.statusTitle.textContent = title;
+                this.statusMessage.textContent = message;
+                this.progressText.textContent = `进度: ${progress}%`;
+                this.progressFill.style.width = `${progress}%`;
+            }
+
+            showProgress() {
+                this.progressContainer.style.display = 'block';
+            }
+
+            showResult(result) {
+                this.progressContainer.style.display = 'none';
+                this.resultContainer.style.display = 'block';
+                
+                if (result && result.video_path) {
+                    this.resultMessage.textContent = '视频下载完成！';
+                    this.downloadLinks.innerHTML = `
+                        <a href="/downloads/${result.video_path}" class="download-link" download>
+                            📥 下载视频文件
+                        </a>
+                    `;
+                }
+            }
+
+            showError(message) {
+                this.progressContainer.style.display = 'none';
+                this.errorContainer.style.display = 'block';
+                this.errorMessage.textContent = message;
+            }
+
+            hideContainers() {
+                this.progressContainer.style.display = 'none';
+                this.resultContainer.style.display = 'none';
+                this.errorContainer.style.display = 'none';
+            }
+
+            disableForm() {
+                this.downloadBtn.disabled = true;
+                this.downloadBtn.textContent = '⏳ 下载中...';
+            }
+
+            enableForm() {
+                this.downloadBtn.disabled = false;
+                this.downloadBtn.textContent = '🚀 开始下载';
+            }
+
+            stopStatusPolling() {
+                if (this.statusInterval) {
+                    clearInterval(this.statusInterval);
+                    this.statusInterval = null;
+                }
+            }
+
+            normalizeUrl(url) {
+                // 移除首尾空格
+                url = url.trim();
+                
+                // 如果已经是完整的URL，直接返回
+                if (url.startsWith('http://') || url.startsWith('https://')) {
+                    return url;
+                }
+                
+                // 如果以www.开头，添加https://
+                if (url.startsWith('www.')) {
+                    return 'https://' + url;
+                }
+                
+                // 如果以youtube.com或youtu.be开头，添加https://
+                if (url.startsWith('youtube.com') || url.startsWith('youtu.be') || url.startsWith('m.youtube.com')) {
+                    return 'https://' + url;
+                }
+                
+                // 如果包含youtube相关域名但没有协议，添加https://
+                if (url.includes('youtube.com') || url.includes('youtu.be')) {
+                    if (!url.startsWith('http')) {
+                        return 'https://' + url;
+                    }
+                }
+                
+                // 默认返回原URL
+                return url;
+            }
+            
+            // 调试方法
+            clearCurrentTask() {
+                this.currentTaskId = null;
+                this.stopStatusPolling();
+                this.hideContainers();
+                this.enableForm();
+                console.log('Current task cleared');
+            }
+            
+            async checkSpecificTask() {
+                const taskId = document.getElementById('debugTaskId').value.trim();
+                if (!taskId) {
+                    alert('请输入任务ID');
+                    return;
+                }
+                
+                try {
+                    const response = await fetch(`/status/${taskId}`);
+                    const data = await response.json();
+                    console.log('Specific task status:', data);
+                    alert(`任务状态: ${data.status}\n消息: ${data.message}`);
+                } catch (error) {
+                    console.error('Error checking specific task:', error);
+                    alert(`检查失败: ${error.message}`);
+                }
+            }
+            
+            showDebugInfo() {
+                const info = {
+                    currentTaskId: this.currentTaskId,
+                    statusInterval: this.statusInterval,
+                    isPolling: !!this.statusInterval
+                };
+                console.log('Debug info:', info);
+                alert(`当前任务ID: ${info.currentTaskId || '无'}\n轮询状态: ${info.isPolling ? '进行中' : '已停止'}`);
+            }
+        }
+
+        // 初始化应用
+        document.addEventListener('DOMContentLoaded', () => {
+            window.downloader = new YouTubeDownloader();
+        });
+    </script>
+</body>
+</html>
