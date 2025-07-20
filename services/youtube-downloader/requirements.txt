@@ -10,7 +10,7 @@ celery[redis]==5.3.4
 redis==4.6.0
 
 # Data validation
-pydantic==2.5.2
+pydantic==2.10.3
 
 # HTTP client
 httpx==0.25.2
