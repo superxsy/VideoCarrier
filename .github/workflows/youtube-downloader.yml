@@ -171,6 +171,7 @@ jobs:
       with:
         method: kubeconfig
         kubeconfig: ${{ secrets.KUBE_CONFIG_STAGING }}
+        cluster-type: generic
     
     - name: Deploy to staging
       run: |
@@ -213,6 +214,7 @@ jobs:
       with:
         method: kubeconfig
         kubeconfig: ${{ secrets.KUBE_CONFIG_PRODUCTION }}
+        cluster-type: generic
     
     - name: Deploy to production
       run: |

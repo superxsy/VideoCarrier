@@ -54,6 +54,89 @@
 
 ### 本地开发（Windows）
 
+#### 方法一：完整本地环境（推荐）
+
+1. **环境准备**
+   ```powershell
+   # 确保已安装 Python 3.11+
+   python --version
+   
+   # 克隆项目并进入目录
+   cd C:\code\VideoCarrier\services\youtube-downloader
+   ```
+
+2. **创建虚拟环境**
+   ```powershell
+   # 创建虚拟环境
+   python -m venv venv
+   
+   # 激活虚拟环境
+   venv\Scripts\activate
+   ```
+
+3. **安装依赖**
+   ```powershell
+   # 安装 Python 依赖
+   pip install -r requirements.txt
+   ```
+
+4. **安装 Redis**
+   ```powershell
+   # 下载 Redis for Windows
+   Invoke-WebRequest -Uri 'https://github.com/tporadowski/redis/releases/download/v5.0.14.1/Redis-x64-5.0.14.1.zip' -OutFile 'Redis-x64-5.0.14.1.zip'
+   
+   # 解压 Redis
+   Expand-Archive -Path 'Redis-x64-5.0.14.1.zip' -DestinationPath 'Redis' -Force
+   ```
+
+5. **配置环境变量**
+   ```powershell
+   # 复制环境配置文件
+   cp .env.example .env
+   
+   # 编辑 .env 文件，确保 Redis URL 正确
+   # REDIS_URL=redis://localhost:6379/0
+   ```
+
+6. **启动服务**
+   
+   **终端 1 - 启动 Redis 服务器：**
+   ```powershell
+   # 启动 Redis 服务器
+   C:\code\VideoCarrier\Redis\redis-server.exe
+   ```
+   
+   **终端 2 - 启动 FastAPI 服务：**
+   ```powershell
+   # 进入项目目录并激活虚拟环境
+   cd C:\code\VideoCarrier\services\youtube-downloader
+   venv\Scripts\activate
+   
+   # 启动 API 服务
+   uvicorn app.main:app --reload --port 8000
+   ```
+   
+   **终端 3 - 启动 Celery Worker：**
+   ```powershell
+   # 进入项目目录并激活虚拟环境
+   cd C:\code\VideoCarrier\services\youtube-downloader
+   venv\Scripts\activate
+   
+   # 启动 Celery Worker
+   venv\Scripts\celery.exe -A app.celery_app worker --loglevel=info
+   ```
+
+7. **验证服务**
+   ```powershell
+   # 检查 API 服务
+   Invoke-RestMethod -Uri "http://localhost:8000/health" -Method Get
+   
+   # 访问 API 文档
+   Start-Process "http://localhost:8000/docs"
+   ```
+
+#### 方法二：使用 Docker Redis
+
 1. **安装依赖**
    ```powershell
    pip install -r requirements.txt
@@ -75,17 +158,174 @@
    uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
    ```
 
-### 使用 PowerShell 测试
+### 功能测试指南
+
+#### 基础功能测试
+
+1. **健康检查测试**
+   ```powershell
+   # 检查服务健康状态
+   Invoke-RestMethod -Uri "http://localhost:8000/health" -Method Get
+   
+   # 预期响应：
+   # {
+   #   "status": "healthy",
+   #   "timestamp": "2023-12-01T10:00:00Z",
+   #   "version": "1.0.0"
+   # }
+   ```
+
+2. **视频信息获取测试**
+   ```powershell
+   # 获取视频信息（无需下载）
+   $videoInfo = Invoke-RestMethod -Uri "http://localhost:8000/info?url=https://www.youtube.com/watch?v=dQw4w9WgXcQ" -Method Get
+   Write-Output $videoInfo
+   ```
+
+3. **下载任务测试**
+   ```powershell
+   # 提交下载任务
+   $downloadRequest = @{
+       url = "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+       quality = "720p"
+       audio_only = $false
+       subtitle_langs = @("en", "zh-CN")
+       download_thumbnail = $true
+   } | ConvertTo-Json
+   
+   $response = Invoke-RestMethod -Uri "http://localhost:8000/download" -Method Post -ContentType "application/json" -Body $downloadRequest
+   Write-Output "任务ID: $($response.task_id)"
+   ```
+
+4. **任务状态监控**
+   ```powershell
+   # 持续监控任务状态
+   $taskId = $response.task_id
+   do {
+       $status = Invoke-RestMethod -Uri "http://localhost:8000/status/$taskId" -Method Get
+       Write-Output "状态: $($status.status), 进度: $($status.progress)%"
+       
+       if ($status.status -eq "success") {
+           Write-Output "下载完成！"
+           Write-Output "文件路径: $($status.result.video_path)"
+           break
+       } elseif ($status.status -eq "failure") {
+           Write-Output "下载失败: $($status.message)"
+           break
+       }
+       
+       Start-Sleep -Seconds 5
+   } while ($true)
+   ```
+
+#### 高级功能测试
+
+1. **仅音频下载测试**
+   ```powershell
+   $audioRequest = @{
+       url = "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+       audio_only = $true
+       quality = "best"
+   } | ConvertTo-Json
+   
+   $audioResponse = Invoke-RestMethod -Uri "http://localhost:8000/download" -Method Post -ContentType "application/json" -Body $audioRequest
+   ```
+
+2. **多语言字幕测试**
+   ```powershell
+   $subtitleRequest = @{
+       url = "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+       quality = "720p"
+       subtitle_langs = @("en", "zh-CN", "ja", "ko")
+   } | ConvertTo-Json
+   
+   $subtitleResponse = Invoke-RestMethod -Uri "http://localhost:8000/download" -Method Post -ContentType "application/json" -Body $subtitleRequest
+   ```
+
+3. **批量测试脚本**
+   ```powershell
+   # 批量测试多个视频
+   $testUrls = @(
+       "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+       "https://www.youtube.com/watch?v=9bZkp7q19f0"
+   )
+   
+   foreach ($url in $testUrls) {
+       Write-Output "测试视频: $url"
+       
+       # 获取视频信息
+       try {
+           $info = Invoke-RestMethod -Uri "http://localhost:8000/info?url=$url" -Method Get
+           Write-Output "标题: $($info.title)"
+           Write-Output "时长: $($info.duration) 秒"
+       } catch {
+           Write-Output "获取信息失败: $($_.Exception.Message)"
+       }
+   }
+   ```
+
+#### 错误处理测试
+
+1. **无效URL测试**
+   ```powershell
+   # 测试无效的YouTube URL
+   try {
+       $invalidRequest = @{
+           url = "https://www.invalid-url.com/watch?v=invalid"
+           quality = "720p"
+       } | ConvertTo-Json
+       
+       $invalidResponse = Invoke-RestMethod -Uri "http://localhost:8000/download" -Method Post -ContentType "application/json" -Body $invalidRequest
+   } catch {
+       Write-Output "预期的错误: $($_.Exception.Message)"
+   }
+   ```
+
+2. **服务状态检查**
+   ```powershell
+   # 检查所有服务是否正常运行
+   Write-Output "=== 服务状态检查 ==="
+   
+   # 检查 API 服务
+   try {
+       $health = Invoke-RestMethod -Uri "http://localhost:8000/health" -Method Get
+       Write-Output "✅ API 服务: $($health.status)"
+   } catch {
+       Write-Output "❌ API 服务: 无法连接"
+   }
+   
+   # 检查 Redis 连接
+   try {
+       $redisTest = Invoke-RestMethod -Uri "http://localhost:8000/health" -Method Get
+       Write-Output "✅ Redis 连接: 正常"
+   } catch {
+       Write-Output "❌ Redis 连接: 异常"
+   }
+   ```
+
+#### 性能测试
 
 ```powershell
-# 提交下载任务
-$response = Invoke-RestMethod -Uri "http://localhost:8000/download" -Method Post -ContentType "application/json" -Body '{"url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ", "quality": "720p"}'
+# 并发下载测试
+$jobs = @()
+for ($i = 1; $i -le 3; $i++) {
+    $job = Start-Job -ScriptBlock {
+        param($url, $quality)
+        
+        $request = @{
+            url = $url
+            quality = $quality
+        } | ConvertTo-Json
+        
+        $response = Invoke-RestMethod -Uri "http://localhost:8000/download" -Method Post -ContentType "application/json" -Body $request
+        return $response.task_id
+    } -ArgumentList "https://www.youtube.com/watch?v=dQw4w9WgXcQ", "720p"
+    
+    $jobs += $job
+}
 
-# 查询任务状态
-Invoke-RestMethod -Uri "http://localhost:8000/status/$($response.task_id)" -Method Get
-
-# 获取视频信息
-Invoke-RestMethod -Uri "http://localhost:8000/info?url=https://www.youtube.com/watch?v=dQw4w9WgXcQ" -Method Get
+# 等待所有任务完成
+$jobs | Wait-Job | Receive-Job
 ```
 
 ## 📚 API 文档
