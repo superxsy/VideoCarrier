@@ -19,12 +19,27 @@ class YouTubeDownloader:
         # yt-dlp基础配置
         self.base_opts = {
             "outtmpl": str(self.download_path / "%(id)s.%(ext)s"),
-            "writesubtitles": True,
-            "writeautomaticsub": True,
-            "writethumbnail": True,
+            "writesubtitles": False,  # 默认不下载字幕，由参数控制
+            "writeautomaticsub": False,  # 默认不下载自动字幕，由参数控制
+            "writethumbnail": False,  # 默认不下载缩略图，由参数控制
             "ignoreerrors": True,
             "no_warnings": False,
             "extractflat": False,
+            # 添加User-Agent和其他反反爬虫设置
+            "http_headers": {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+                "Accept-Language": "en-us,en;q=0.5",
+                "Accept-Encoding": "gzip,deflate",
+                "Accept-Charset": "ISO-8859-1,utf-8;q=0.7,*;q=0.7",
+                "Connection": "keep-alive",
+                "Upgrade-Insecure-Requests": "1",
+            },
+            "extractor_retries": 5,
+            "fragment_retries": 5,
+            "retry_sleep_functions": {"http": lambda n: min(4 ** n, 60)},
+            "sleep_interval_requests": 1,
+            "sleep_interval": 1,
         }
 
     def validate_url(self, url: str) -> bool:
@@ -201,17 +216,18 @@ class YouTubeDownloader:
         # 防止下载整个播放列表，只下载当前视频
         opts["noplaylist"] = True
 
-        # 设置质量
+        # 设置质量 - 使用更兼容的格式选择
         if audio_only:
-            opts["format"] = "bestaudio/best"
+            opts["format"] = "bestaudio[ext=m4a]/bestaudio[ext=mp3]/bestaudio"
         elif quality == "best":
-            opts["format"] = "best[height<=1080]"
+            # 优先选择mp4格式，避免webm等可能被限制的格式
+            opts["format"] = "best[ext=mp4][height<=1080]/best[height<=1080]/best"
         elif quality == "worst":
-            opts["format"] = "worst"
+            opts["format"] = "worst[ext=mp4]/worst"
         else:
             # 解析质量设置 (如 "720p")
             height = quality.replace("p", "")
-            opts["format"] = f"best[height<={height}]"
+            opts["format"] = f"best[ext=mp4][height<={height}]/best[height<={height}]"
 
         # 字幕设置
         if subtitle_langs:
@@ -219,18 +235,34 @@ class YouTubeDownloader:
             opts["writesubtitles"] = True
             opts["writeautomaticsub"] = True
 
+        # 缩略图设置
+        if download_thumbnail:
+            opts["writethumbnail"] = True
+            
+        # 设置描述下载
+        if download_description:
+            opts["writedescription"] = True
+            
+        # 添加额外的反反爬虫选项
+        opts["geo_bypass"] = True
+        opts["no_check_certificate"] = True
+
         # 进度回调
         if progress_callback:
             opts["progress_hooks"] = [progress_callback]
 
         try:
+            logger.info(f"Download options: {opts}")
             with yt_dlp.YoutubeDL(opts) as ydl:
                 # 先获取信息
                 info = ydl.extract_info(url, download=False)
                 video_id = info.get("id") if info and isinstance(info, dict) else ""
+                logger.info(f"Video ID: {video_id}")
 
                 # 执行下载
+                logger.info(f"Starting download for URL: {url}")
                 ydl.download([url])
+                logger.info(f"Download completed for video ID: {video_id}")
 
                 # 查找下载的文件
                 video_path = None

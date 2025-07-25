@@ -7,51 +7,57 @@ REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 
 # 创建Celery应用
 celery_app = Celery(
-    "youtube_downloader", broker=REDIS_URL, backend=REDIS_URL, include=["app.tasks"]
+    "app", broker=REDIS_URL, backend=REDIS_URL
 )
 
-# Celery配置
+# 基本Celery配置
 celery_app.conf.update(
-    # 任务序列化
     task_serializer="json",
     accept_content=["json"],
     result_serializer="json",
     timezone="UTC",
     enable_utc=True,
-    # 任务路由
-    task_routes={
-        "app.tasks.download_video_task": {"queue": "download"},
-        "app.tasks.cleanup_task": {"queue": "maintenance"},
-    },
-    # 队列配置
-    task_default_queue="default",
-    task_queues=(
-        Queue("default", routing_key="default"),
-        Queue("download", routing_key="download"),
-        Queue("maintenance", routing_key="maintenance"),
-    ),
-    # 工作进程配置
+    # 添加Redis连接配置
+    broker_connection_retry_on_startup=True,
+    broker_transport_options={'visibility_timeout': 3600},
+    result_expires=3600,
+    # 工作进程配置 - 使用solo pool解决Python 3.13兼容性问题
+    worker_pool='solo',
     worker_prefetch_multiplier=1,
     task_acks_late=True,
-    worker_max_tasks_per_child=1000,
-    # 任务超时设置
-    task_soft_time_limit=1800,  # 30分钟软超时
-    task_time_limit=2400,  # 40分钟硬超时
-    # 结果过期时间
-    result_expires=3600,  # 1小时
-    # 任务重试配置
-    task_default_retry_delay=60,
-    task_max_retries=3,
-    # 监控配置
-    worker_send_task_events=True,
-    task_send_sent_event=True,
-    # 日志配置
-    worker_log_format="[%(asctime)s: %(levelname)s/%(processName)s] %(message)s",
-    worker_task_log_format="[%(asctime)s: %(levelname)s/%(processName)s][%(task_name)s(%(task_id)s)] %(message)s",
+    # 任务路由配置
+    task_routes={
+        'app.tasks.download_video_task': {'queue': 'download'},
+        'app.tasks.get_video_info_task': {'queue': 'download'},
+        'app.tasks.cleanup_task': {'queue': 'maintenance'},
+        'app.tasks.health_check_task': {'queue': 'default'},
+    },
+    # 队列配置
+    task_default_queue='default',
+    task_queues={
+        'default': {
+            'exchange': 'default',
+            'exchange_type': 'direct',
+            'routing_key': 'default'
+        },
+        'download': {
+            'exchange': 'download',
+            'exchange_type': 'direct',
+            'routing_key': 'download'
+        },
+        'maintenance': {
+            'exchange': 'maintenance',
+            'exchange_type': 'direct',
+            'routing_key': 'maintenance'
+        }
+    },
 )
 
 # 任务发现
 celery_app.autodiscover_tasks(["app"])
+
+# 显式导入任务模块确保注册
+from . import tasks
 
 
 @celery_app.task(bind=True)

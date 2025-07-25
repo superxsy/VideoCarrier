@@ -13,10 +13,13 @@ from .models import DownloadResult
 downloader = YouTubeDownloader(download_path="downloads")
 
 
+
+
+
 @celery_app.task(bind=True, name="app.tasks.download_video_task")
 def download_video_task(
-    self=None,
-    url: str = None,
+    self,
+    url: str,
     quality: str = "best",
     audio_only: bool = False,
     subtitle_langs: Optional[List[str]] = None,
@@ -24,27 +27,13 @@ def download_video_task(
     download_description: bool = False,
     **kwargs
 ) -> Dict[str, Any]:
-    # 处理测试环境中直接调用的情况
-    if self is None or isinstance(self, str):
-        # 在测试环境中，第一个参数可能是url
-        if isinstance(self, str):
-            url = self
-            self = None
-        elif url is None:
-            raise ValueError("URL is required")
     """异步视频下载任务"""
 
     if subtitle_langs is None:
         subtitle_langs = ["zh-CN", "en"]
 
-    # 在测试环境中，self.request可能不存在或为None
-    try:
-        if self and hasattr(self, 'request') and self.request:
-            task_id = getattr(self.request, 'id', None) or 'test-task-id'
-        else:
-            task_id = 'test-task-id'
-    except (AttributeError, TypeError):
-        task_id = 'test-task-id'
+    # 获取任务ID
+    task_id = self.request.id if self.request else 'unknown-task-id'
     start_time = time.time()
 
     def progress_hook(d):
@@ -61,21 +50,20 @@ def download_video_task(
                 else:
                     progress = 0
 
-                # 更新任务状态（仅在Celery环境中）
-                if self and hasattr(self, 'update_state') and hasattr(self, 'request') and self.request and getattr(self.request, 'id', None):
-                    self.update_state(
-                        state="PROGRESS",
-                        meta={
-                            "progress": progress,
-                            "current_step": f"Downloading: {d.get('filename', 'video')}",
-                            "downloaded_bytes": d.get("downloaded_bytes", 0),
-                            "total_bytes": d.get(
-                                "total_bytes", d.get("total_bytes_estimate", 0)
-                            ),
-                            "speed": d.get("speed", 0),
-                            "eta": d.get("eta", 0),
-                        },
-                    )
+                # 更新任务状态
+                self.update_state(
+                    state="PROGRESS",
+                    meta={
+                        "progress": progress,
+                        "current_step": f"Downloading: {d.get('filename', 'video')}",
+                        "downloaded_bytes": d.get("downloaded_bytes", 0),
+                        "total_bytes": d.get(
+                            "total_bytes", d.get("total_bytes_estimate", 0)
+                        ),
+                        "speed": d.get("speed", 0),
+                        "eta": d.get("eta", 0),
+                    },
+                )
 
                 logger.info(f"Task {task_id}: Download progress {progress}%")
 
@@ -83,14 +71,13 @@ def download_video_task(
                 logger.error(f"Error updating progress: {str(e)}")
 
         elif d["status"] == "finished":
-            if self and hasattr(self, 'update_state') and hasattr(self, 'request') and self.request and getattr(self.request, 'id', None):
-                self.update_state(
-                    state="PROGRESS",
-                    meta={
-                        "progress": 100,
-                        "current_step": f"Finished downloading: {d.get('filename', 'video')}",
-                    },
-                )
+            self.update_state(
+                state="PROGRESS",
+                meta={
+                    "progress": 100,
+                    "current_step": f"Finished downloading: {d.get('filename', 'video')}",
+                },
+            )
 
     try:
         logger.info(f"Starting download task {task_id} for URL: {url}")
@@ -99,15 +86,14 @@ def download_video_task(
         if not downloader.validate_url(url):
             raise ValueError(f"Invalid YouTube URL: {url}")
 
-        # 更新状态：开始处理（仅在Celery环境中）
-        if self and hasattr(self, 'update_state') and hasattr(self, 'request') and self.request and getattr(self.request, 'id', None):
-            self.update_state(
-                state="PROGRESS",
-                meta={
-                    "progress": 0,
-                    "current_step": "Validating URL and extracting metadata",
-                },
-            )
+        # 更新状态：开始处理
+        self.update_state(
+            state="PROGRESS",
+            meta={
+                "progress": 0,
+                "current_step": "Validating URL and extracting metadata",
+            },
+        )
 
         # 执行下载
         result = downloader.download_video(
@@ -143,17 +129,15 @@ def download_video_task(
     except Exception as exc:
         logger.error(f"Task {task_id} failed: {str(exc)}")
 
-        # 重试逻辑（仅在Celery环境中）
-        if self and hasattr(self, 'request') and hasattr(self, 'retry'):
-            if self.request.retries < self.max_retries:
-                logger.info(f"Retrying task {task_id} (attempt {self.request.retries + 1})")
-                raise self.retry(exc=exc, countdown=60, max_retries=3)
+        # 重试逻辑
+        if self.request.retries < self.max_retries:
+            logger.info(f"Retrying task {task_id} (attempt {self.request.retries + 1})")
+            raise self.retry(exc=exc, countdown=60, max_retries=3)
 
-            # 最终失败
-            if hasattr(self, 'request') and self.request and getattr(self.request, 'id', None):
-                self.update_state(
-                    state="FAILURE", meta={"error": str(exc), "task_id": task_id, "url": url}
-                )
+        # 最终失败
+        self.update_state(
+            state="FAILURE", meta={"error": str(exc), "task_id": task_id, "url": url}
+        )
         raise exc
 
 
@@ -283,7 +267,7 @@ celery_app.conf.beat_schedule = {
     # 每天凌晨2点清理旧文件
     "cleanup-old-files": {
         "task": "app.tasks.cleanup_task",
-        "schedule": crontab(hour=2, minute=0),
+        "schedule": crontab(hour="2", minute="0"),
         "args": (24,),  # 清理24小时前的文件
     },
     # 每5分钟进行健康检查

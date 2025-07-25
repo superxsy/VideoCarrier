@@ -77,12 +77,14 @@ async def download_video(request: DownloadRequest):
         task = celery_app.send_task(
             "app.tasks.download_video_task",
             kwargs={
-                "task_id": task_id,
                 "url": str(request.url),
                 "quality": request.quality,
                 "audio_only": request.audio_only,
                 "subtitle_langs": request.subtitle_langs,
+                "download_thumbnail": True,
+                "download_description": False,
             },
+            task_id=task_id,
         )
 
         logger.info(f"Download task submitted: {task_id} for URL: {request.url}")
