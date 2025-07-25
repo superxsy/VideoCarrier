@@ -4,6 +4,7 @@ from unittest.mock import Mock, patch, MagicMock
 from pathlib import Path
 import os
 import time
+from celery import current_app
 
 from app.tasks import (
     download_video_task,
@@ -56,13 +57,16 @@ class TestCeleryTasks:
         
         mock_downloader.download_video.return_value = mock_result
         
-        # 执行任务
-        result = download_video_task(
-            url="https://www.youtube.com/watch?v=test_video",
-            quality="720p",
-            audio_only=False,
-            subtitle_langs=["en"]
-        )
+        # 使用 apply() 方法执行任务，提供任务上下文
+        result = download_video_task.apply(
+            args=(),
+            kwargs={
+                "url": "https://www.youtube.com/watch?v=test_video",
+                "quality": "720p",
+                "audio_only": False,
+                "subtitle_langs": ["en"]
+            }
+        ).result
         
         # 验证结果
         assert result["video_path"] == f"{temp_dir}/test_video.mp4"
@@ -131,11 +135,14 @@ class TestCeleryTasks:
         
         mock_downloader.download_video.side_effect = mock_download_with_progress
         
-        # 执行任务
-        result = download_video_task(
-            url="https://www.youtube.com/watch?v=test_progress",
-            quality="720p"
-        )
+        # 使用 apply() 方法执行任务
+        result = download_video_task.apply(
+            args=(),
+            kwargs={
+                "url": "https://www.youtube.com/watch?v=test_progress",
+                "quality": "720p"
+            }
+        ).result
         
         # 验证结果
         assert result["video_path"] == "/downloads/test.mp4"
@@ -152,10 +159,13 @@ class TestCeleryTasks:
         
         # 执行任务并验证异常
         with pytest.raises(Exception, match="Download failed: Video not available"):
-            download_video_task(
-                url="https://www.youtube.com/watch?v=invalid",
-                quality="720p"
-            )
+            download_video_task.apply(
+                args=(),
+                kwargs={
+                    "url": "https://www.youtube.com/watch?v=invalid",
+                    "quality": "720p"
+                }
+            ).result
     
     @patch('app.tasks.downloader')
     def test_download_video_task_audio_only(self, mock_downloader, temp_dir):
@@ -190,11 +200,14 @@ class TestCeleryTasks:
         
         mock_downloader.download_video.return_value = mock_result
         
-        # 执行任务
-        result = download_video_task(
-            url="https://www.youtube.com/watch?v=test_audio",
-            audio_only=True
-        )
+        # 使用 apply() 方法执行任务
+        result = download_video_task.apply(
+            args=(),
+            kwargs={
+                "url": "https://www.youtube.com/watch?v=test_audio",
+                "audio_only": True
+            }
+        ).result
         
         # 验证结果
         assert result["video_path"] is None
@@ -396,15 +409,18 @@ class TestCeleryTasks:
         
         mock_downloader.download_video.return_value = mock_result
         
-        # 执行任务
-        result = download_video_task(
-            url="https://www.youtube.com/watch?v=full_test",
-            quality="1080p",
-            audio_only=False,
-            subtitle_langs=["en", "zh-CN"],
-            download_thumbnail=True,
-            download_description=True
-        )
+        # 使用 apply() 方法执行任务
+        result = download_video_task.apply(
+            args=(),
+            kwargs={
+                "url": "https://www.youtube.com/watch?v=full_test",
+                "quality": "1080p",
+                "audio_only": False,
+                "subtitle_langs": ["en", "zh-CN"],
+                "download_thumbnail": True,
+                "download_description": True
+            }
+        ).result
         
         # 验证结果
         assert result["video_path"] == f"{temp_dir}/full_test.mp4"

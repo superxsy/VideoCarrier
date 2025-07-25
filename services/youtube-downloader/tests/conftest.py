@@ -11,6 +11,11 @@ from pathlib import Path
 from unittest.mock import Mock, patch
 from typing import Generator, Dict, Any
 
+# 设置测试环境变量（必须在导入应用组件之前）
+os.environ["TESTING"] = "true"
+os.environ["CELERY_TASK_ALWAYS_EAGER"] = "true"
+os.environ["CELERY_TASK_EAGER_PROPAGATES"] = "true"
+
 from fastapi.testclient import TestClient
 
 # 导入应用组件
