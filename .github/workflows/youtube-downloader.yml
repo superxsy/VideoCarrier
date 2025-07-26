@@ -172,6 +172,8 @@ jobs:
         method: kubeconfig
         kubeconfig: ${{ secrets.KUBE_CONFIG_STAGING }}
         cluster-type: generic
+      env:
+        KUBE_CONFIG_DATA: ${{ secrets.KUBE_CONFIG_STAGING }}
     
     - name: Deploy to staging
       run: |
@@ -215,6 +217,8 @@ jobs:
         method: kubeconfig
         kubeconfig: ${{ secrets.KUBE_CONFIG_PRODUCTION }}
         cluster-type: generic
+      env:
+        KUBE_CONFIG_DATA: ${{ secrets.KUBE_CONFIG_PRODUCTION }}
     
     - name: Deploy to production
       run: |
