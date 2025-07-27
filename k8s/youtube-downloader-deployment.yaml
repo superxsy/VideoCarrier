@@ -22,6 +22,7 @@ spec:
       containers:
       - name: youtube-downloader
         image: videocarrier/youtube-downloader:v1.0.0
+        imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 8000
           name: http
@@ -67,9 +68,6 @@ spec:
       - name: logs-volume
         persistentVolumeClaim:
           claimName: logs-pvc
-      restartPolicy: Always
-      imagePullPolicy: IfNotPresent
-
 ---
 apiVersion: v1
 kind: Service
@@ -87,7 +85,6 @@ spec:
     targetPort: 8000
     protocol: TCP
   type: ClusterIP
-
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -113,6 +110,7 @@ spec:
       containers:
       - name: celery-worker
         image: videocarrier/youtube-downloader:v1.0.0
+        imagePullPolicy: IfNotPresent
         command: ["celery"]
         args: ["-A", "app.celery", "worker", "--loglevel=info", "--concurrency=2"]
         env:
@@ -153,9 +151,6 @@ spec:
       - name: logs-volume
         persistentVolumeClaim:
           claimName: logs-pvc
-      restartPolicy: Always
-      imagePullPolicy: IfNotPresent
-
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -181,6 +176,7 @@ spec:
       containers:
       - name: celery-flower
         image: videocarrier/youtube-downloader:v1.0.0
+        imagePullPolicy: IfNotPresent
         command: ["celery"]
         args: ["-A", "app.celery", "flower", "--port=5555"]
         ports:
@@ -212,9 +208,6 @@ spec:
           periodSeconds: 10
           timeoutSeconds: 5
           failureThreshold: 3
-      restartPolicy: Always
-      imagePullPolicy: IfNotPresent
-
 ---
 apiVersion: v1
 kind: Service
