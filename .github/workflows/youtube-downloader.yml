@@ -132,6 +132,10 @@ jobs:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
     
+    - name: Set short SHA
+      id: short_sha
+      run: echo "SHORT_SHA=${GITHUB_SHA::7}" >> $GITHUB_ENV
+    
     - name: Extract metadata
       id: meta
       uses: docker/metadata-action@v5
@@ -140,7 +144,7 @@ jobs:
         tags: |
           type=ref,event=branch
           type=ref,event=pr
-          type=sha,prefix={{branch}}-
+          type=sha,format=short,prefix={{branch}}-
           type=raw,value=latest,enable={{is_default_branch}}
     
     - name: Build and push Docker image
@@ -241,15 +245,15 @@ jobs:
         password: ${{ secrets.GITHUB_TOKEN }}
     
     - name: Pull Docker image
-      run: docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:main-${{ github.sha }}
+      run: docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:main-${{ env.SHORT_SHA }}
     
     - name: Load image to Kind
-      run: kind load docker-image ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:main-${{ github.sha }} --name production-cluster
+      run: kind load docker-image ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:main-${{ env.SHORT_SHA }} --name production-cluster
     
     - name: Deploy to Kind
       run: |
         # 更新镜像标签
-        sed -i "s|videocarrier/youtube-downloader:v1.0.0|${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:main-${{ github.sha }}|g" k8s/youtube-downloader-deployment.yaml
+        sed -i "s|videocarrier/youtube-downloader:v1.0.0|${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:main-${{ env.SHORT_SHA }}|g" k8s/youtube-downloader-deployment.yaml
         
         # 应用配置
         kubectl apply -f k8s/namespace.yaml
