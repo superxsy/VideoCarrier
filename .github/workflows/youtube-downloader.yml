@@ -244,6 +244,10 @@ jobs:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
     
+    - name: Set short SHA
+      id: short_sha
+      run: echo "SHORT_SHA=${GITHUB_SHA::7}" >> $GITHUB_ENV
+    
     - name: Pull Docker image
       run: docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:main-${{ env.SHORT_SHA }}
     
