@@ -156,6 +156,12 @@ jobs:
           BUILDTIME=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.created'] }}
           VERSION=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.version'] }}
           REVISION=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.revision'] }}
+    
+    - name: Inspect pushed image manifest
+      run: docker manifest inspect ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:main-${{ github.sha }} || true
+    
+    - name: List Docker images
+      run: docker images | grep ${{ env.IMAGE_NAME }}
 
   deploy-staging:
     needs: build-and-push
