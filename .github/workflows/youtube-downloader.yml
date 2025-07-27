@@ -252,12 +252,12 @@ jobs:
       run: docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:main-${{ steps.vars.outputs.sha_short }}
     
     - name: Load image to Kind
-      run: kind load docker-image ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:main-${{ env.SHORT_SHA }} --name production-cluster
+      run: kind load docker-image ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:main-${{ steps.vars.outputs.sha_short }} --name production-cluster
     
     - name: Deploy to Kind
       run: |
         # 更新镜像标签
-        sed -i "s|videocarrier/youtube-downloader:v1.0.0|${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:main-${{ env.SHORT_SHA }}|g" k8s/youtube-downloader-deployment.yaml
+        sed -i "s|videocarrier/youtube-downloader:v1.0.0|${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:main-${{ steps.vars.outputs.sha_short }}|g" k8s/youtube-downloader-deployment.yaml
         
         # 应用配置
         kubectl apply -f k8s/namespace.yaml
