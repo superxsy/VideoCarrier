@@ -245,11 +245,11 @@ jobs:
         password: ${{ secrets.GITHUB_TOKEN }}
     
     - name: Set short SHA
-      id: short_sha
-      run: echo "SHORT_SHA=$(echo ${{ github.sha }} | cut -c 1-7)" >> $GITHUB_ENV
+      id: vars
+      run: echo "sha_short=$(echo ${{ github.sha }} | cut -c 1-7)" >> $GITHUB_OUTPUT
     
     - name: Pull Docker image
-      run: docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:main-${{ env.SHORT_SHA }}
+      run: docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:main-${{ steps.vars.outputs.sha_short }}
     
     - name: Load image to Kind
       run: kind load docker-image ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:main-${{ env.SHORT_SHA }} --name production-cluster
