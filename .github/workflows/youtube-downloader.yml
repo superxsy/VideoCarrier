@@ -236,6 +236,8 @@ jobs:
         # 应用配置
         kubectl apply -f k8s/namespace.yaml
         kubectl apply -f k8s/redis-deployment.yaml
+        # 等待 Redis 部署就绪
+        kubectl rollout status deployment/redis -n videocarrier --timeout=300s
         kubectl apply -f k8s/youtube-downloader-deployment.yaml
         
         # 滚动更新
