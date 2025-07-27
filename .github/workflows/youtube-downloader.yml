@@ -226,7 +226,20 @@ jobs:
       run: kind create cluster --name production-cluster
     
     - name: Set kubeconfig
-      run: kind get kubeconfig --name production-cluster > $HOME/.kube/config
+      run: echo "KUBECONFIG=$HOME/.kube/config" >> $GITHUB_ENV
+    
+    - name: Log in to Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    
+    - name: Pull Docker image
+      run: docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:main-${{ github.sha }}
+    
+    - name: Load image to Kind
+      run: kind load docker-image ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:main-${{ github.sha }} --name production-cluster
     
     - name: Deploy to Kind
       run: |
