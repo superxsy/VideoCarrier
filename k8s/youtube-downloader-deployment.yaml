@@ -8,7 +8,7 @@ metadata:
     component: downloader
     version: v1.0.0
 spec:
-  replicas: 2
+  replicas: 1  # 减少为 1 个副本，因为 PVC 是 ReadWriteOnce
   selector:
     matchLabels:
       app: youtube-downloader
@@ -96,7 +96,7 @@ metadata:
     component: worker
     version: v1.0.0
 spec:
-  replicas: 3
+  replicas: 1  # 减少为 1 个副本，因为 PVC 是 ReadWriteOnce
   selector:
     matchLabels:
       app: celery-worker
