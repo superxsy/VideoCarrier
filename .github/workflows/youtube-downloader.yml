@@ -134,7 +134,7 @@ jobs:
     
     - name: Set short SHA
       id: short_sha
-      run: echo "SHORT_SHA=${GITHUB_SHA::7}" >> $GITHUB_ENV
+      run: echo "SHORT_SHA=$(echo ${{ github.sha }} | cut -c 1-7)" >> $GITHUB_ENV
     
     - name: Extract metadata
       id: meta
@@ -246,7 +246,7 @@ jobs:
     
     - name: Set short SHA
       id: short_sha
-      run: echo "SHORT_SHA=${GITHUB_SHA::7}" >> $GITHUB_ENV
+      run: echo "SHORT_SHA=$(echo ${{ github.sha }} | cut -c 1-7)" >> $GITHUB_ENV
     
     - name: Pull Docker image
       run: docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:main-${{ env.SHORT_SHA }}
