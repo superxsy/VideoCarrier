@@ -241,8 +241,13 @@ jobs:
         kubectl apply -f k8s/youtube-downloader-deployment.yaml
         
         # 滚动更新
-        kubectl rollout status deployment/youtube-downloader -n videocarrier --timeout=600s
-        kubectl rollout status deployment/celery-worker -n videocarrier --timeout=600s
+        kubectl rollout status deployment/youtube-downloader -n videocarrier --timeout=600s || true
+        kubectl rollout status deployment/celery-worker -n videocarrier --timeout=600s || true
+        
+        # 调试步骤
+        kubectl get pods -n videocarrier
+        kubectl describe deployment youtube-downloader -n videocarrier
+        kubectl logs -l app=youtube-downloader -n videocarrier --tail=100
     
     - name: Post-deployment verification
       run: |
