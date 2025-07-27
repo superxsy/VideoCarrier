@@ -166,18 +166,21 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
     
-    - name: Configure kubectl
-      uses: azure/k8s-set-context@v3
-      with:
-        method: kubeconfig
-        kubeconfig: ${{ secrets.KUBE_CONFIG_STAGING }}
-        cluster-type: generic
-      env:
-        KUBE_CONFIG_DATA: ${{ secrets.KUBE_CONFIG_STAGING }}
-    
-    - name: Deploy to staging
+    - name: Install Kind
       run: |
-        # 更新镜像标签
+        curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.23.0/kind-linux-amd64
+        chmod +x ./kind
+        sudo mv ./kind /usr/local/bin/kind
+    
+    - name: Create Kind cluster
+      run: kind create cluster --name staging-cluster
+    
+    - name: Set kubeconfig
+      run: kind get kubeconfig --name staging-cluster > $HOME/.kube/config
+    
+    - name: Deploy to Kind
+      run: |
+        # 更新镜像标签（如果需要）
         sed -i "s|videocarrier/youtube-downloader:v1.0.0|${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:develop-${{ github.sha }}|g" k8s/youtube-downloader-deployment.yaml
         
         # 应用配置
@@ -211,16 +214,19 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
     
-    - name: Configure kubectl
-      uses: azure/k8s-set-context@v3
-      with:
-        method: kubeconfig
-        kubeconfig: ${{ secrets.KUBE_CONFIG_PRODUCTION }}
-        cluster-type: generic
-      env:
-        KUBE_CONFIG_DATA: ${{ secrets.KUBE_CONFIG_PRODUCTION }}
+    - name: Install Kind
+      run: |
+        curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.23.0/kind-linux-amd64
+        chmod +x ./kind
+        sudo mv ./kind /usr/local/bin/kind
     
-    - name: Deploy to production
+    - name: Create Kind cluster
+      run: kind create cluster --name production-cluster
+    
+    - name: Set kubeconfig
+      run: kind get kubeconfig --name production-cluster > $HOME/.kube/config
+    
+    - name: Deploy to Kind
       run: |
         # 更新镜像标签
         sed -i "s|videocarrier/youtube-downloader:v1.0.0|${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:main-${{ github.sha }}|g" k8s/youtube-downloader-deployment.yaml
