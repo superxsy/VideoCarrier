@@ -6,10 +6,12 @@ on:
     paths:
       - 'services/youtube-downloader/**'
       - '.github/workflows/youtube-downloader.yml'
+      - 'k8s/**'
   pull_request:
     branches: [ main ]
     paths:
       - 'services/youtube-downloader/**'
+      - 'k8s/**'
 
 env:
   REGISTRY: ghcr.io
