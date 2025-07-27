@@ -161,7 +161,7 @@ jobs:
       run: docker manifest inspect ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:main-${{ github.sha }} || true
     
     - name: List Docker images
-      run: docker images | grep ${{ env.IMAGE_NAME }}
+      run: docker images | grep ${{ env.IMAGE_NAME }} || true
 
   deploy-staging:
     needs: build-and-push
