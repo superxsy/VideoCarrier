@@ -81,20 +81,19 @@ metadata:
   namespace: videocarrier
 spec:
   limits:
-  - default:
+  - type: Container
+    default:
       cpu: "1000m"
       memory: "2Gi"
     defaultRequest:
       cpu: "100m"
       memory: "256Mi"
-    type: Container
-  - max:
+    max:
       cpu: "4000m"
       memory: "8Gi"
     min:
       cpu: "50m"
       memory: "128Mi"
-    type: Container
   - max:
       storage: "200Gi"
     min:
