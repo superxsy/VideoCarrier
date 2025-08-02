@@ -150,11 +150,11 @@ metadata:
     app: youtube-downloader
 spec:
   accessModes:
-  - ReadWriteMany
+  - ReadWriteOnce  # 修改为 ReadWriteOnce，因为 local-path provisioner 不支持 ReadWriteMany
   resources:
     requests:
       storage: 100Gi
-  storageClassName: shared-storage
+  storageClassName: fast-ssd  # 修改为 fast-ssd，确保使用可用的存储类
 
 ---
 apiVersion: v1
@@ -166,8 +166,8 @@ metadata:
     app: youtube-downloader
 spec:
   accessModes:
-  - ReadWriteMany
+  - ReadWriteOnce  # 修改为 ReadWriteOnce，因为 local-path provisioner 不支持 ReadWriteMany
   resources:
     requests:
       storage: 20Gi
-  storageClassName: shared-storage
+  storageClassName: fast-ssd  # 修改为 fast-ssd，确保使用可用的存储类

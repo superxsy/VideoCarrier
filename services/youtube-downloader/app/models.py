@@ -25,8 +25,8 @@ class DownloadRequest(BaseModel):
         default=["zh-CN", "en"], description="字幕语言列表"
     )
 
-    class Config:
-        json_schema_extra = {
+    model_config = {
+        "json_schema_extra": {
             "example": {
                 "url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
                 "quality": "best",
@@ -34,6 +34,7 @@ class DownloadRequest(BaseModel):
                 "subtitle_langs": ["zh-CN", "en"],
             }
         }
+    }
 
 
 class DownloadResponse(BaseModel):

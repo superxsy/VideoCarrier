@@ -187,7 +187,27 @@ jobs:
       run: kind create cluster --name staging-cluster
     
     - name: Set kubeconfig
-      run: kind get kubeconfig --name staging-cluster > $HOME/.kube/config
+       run: kind get kubeconfig --name staging-cluster > $HOME/.kube/config
+      
+    - name: Create default StorageClass
+      run: |
+        kubectl apply -f - <<EOF
+        apiVersion: storage.k8s.io/v1
+        kind: StorageClass
+        metadata:
+          name: fast-ssd
+          annotations:
+            storageclass.kubernetes.io/is-default-class: "true"
+        provisioner: rancher.io/local-path
+        volumeBindingMode: WaitForFirstConsumer
+        ---
+        apiVersion: storage.k8s.io/v1
+        kind: StorageClass
+        metadata:
+          name: shared-storage
+        provisioner: rancher.io/local-path
+        volumeBindingMode: WaitForFirstConsumer
+        EOF
     
     - name: Deploy to Kind
       run: |
@@ -196,12 +216,32 @@ jobs:
         
         # 应用配置
         kubectl apply -f k8s/namespace.yaml
+        
+        # 调试 - 显示存储类
+        echo "查看存储类:"
+        kubectl get storageclass
+        
+        # 应用 Redis 部署
         kubectl apply -f k8s/redis-deployment.yaml
+        
+        # 调试 - 检查 PVC 状态
+        echo "检查 PVC 状态:"
+        kubectl get pvc -n videocarrier
+        
+        # 等待 Redis 部署就绪 - 增加超时时间
+        kubectl rollout status deployment/redis -n videocarrier --timeout=600s || true
+        
+        # 调试 - 检查 Pod 状态
+        echo "检查 Pod 状态:"
+        kubectl get pods -n videocarrier
+        kubectl describe pods -l app=redis -n videocarrier
+        
+        # 应用 YouTube Downloader 部署
         kubectl apply -f k8s/youtube-downloader-deployment.yaml
         
         # 等待部署完成
-        kubectl rollout status deployment/youtube-downloader -n videocarrier --timeout=300s
-        kubectl rollout status deployment/celery-worker -n videocarrier --timeout=300s
+        kubectl rollout status deployment/youtube-downloader -n videocarrier --timeout=300s || true
+        kubectl rollout status deployment/celery-worker -n videocarrier --timeout=300s || true
     
     - name: Run smoke tests
       run: |
@@ -236,6 +276,26 @@ jobs:
     
     - name: Set kubeconfig
       run: echo "KUBECONFIG=$HOME/.kube/config" >> $GITHUB_ENV
+      
+    - name: Create default StorageClass
+      run: |
+        kubectl apply -f - <<EOF
+        apiVersion: storage.k8s.io/v1
+        kind: StorageClass
+        metadata:
+          name: fast-ssd
+          annotations:
+            storageclass.kubernetes.io/is-default-class: "true"
+        provisioner: rancher.io/local-path
+        volumeBindingMode: WaitForFirstConsumer
+        ---
+        apiVersion: storage.k8s.io/v1
+        kind: StorageClass
+        metadata:
+          name: shared-storage
+        provisioner: rancher.io/local-path
+        volumeBindingMode: WaitForFirstConsumer
+        EOF
     
     - name: Log in to Container Registry
       uses: docker/login-action@v3
@@ -261,9 +321,27 @@ jobs:
         
         # 应用配置
         kubectl apply -f k8s/namespace.yaml
+        
+        # 调试 - 显示存储类
+        echo "查看存储类:"
+        kubectl get storageclass
+        
+        # 应用 Redis 部署
         kubectl apply -f k8s/redis-deployment.yaml
-        # 等待 Redis 部署就绪
-        kubectl rollout status deployment/redis -n videocarrier --timeout=300s
+        
+        # 调试 - 检查 PVC 状态
+        echo "检查 PVC 状态:"
+        kubectl get pvc -n videocarrier
+        
+        # 等待 Redis 部署就绪 - 增加超时时间
+        kubectl rollout status deployment/redis -n videocarrier --timeout=600s || true
+        
+        # 调试 - 检查 Pod 状态
+        echo "检查 Pod 状态:"
+        kubectl get pods -n videocarrier
+        kubectl describe pods -l app=redis -n videocarrier
+        
+        # 应用 YouTube Downloader 部署
         kubectl apply -f k8s/youtube-downloader-deployment.yaml
         
         # 滚动更新

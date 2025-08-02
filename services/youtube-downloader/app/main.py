@@ -6,7 +6,7 @@ from loguru import logger
 import os
 import uuid
 from typing import Dict, Any
-from datetime import datetime
+from datetime import datetime, timezone
 
 from .models import DownloadRequest, DownloadResponse, TaskStatus, HealthCheck
 from .celery_app import celery_app
@@ -34,7 +34,7 @@ async def health_check():
     return {
         "status": "healthy",
         "service": "youtube-downloader",
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
         "version": "1.0.0",
     }
 
@@ -110,7 +110,7 @@ async def get_task_status(task_id: str):
         # 从Celery获取任务状态
         task = celery_app.AsyncResult(task_id)
 
-        current_time = datetime.utcnow()
+        current_time = datetime.now(timezone.utc)
 
         if task.state == "PENDING":
             response = {
